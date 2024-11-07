@@ -64,6 +64,7 @@ CONF_OPENINGS = "openings"
 CONF_OPENINGS_SCOPE = "openings_scope"
 CONF_HEAT_COOL_MODE = "heat_cool_mode"
 CONF_HEAT_PUMP_COOLING = "heat_pump_cooling"
+CONF_COOLER_ALWAYS_ON = "cooler_always_on"
 
 # HVAC power levels
 CONF_HVAC_POWER_LEVELS = "hvac_power_levels"

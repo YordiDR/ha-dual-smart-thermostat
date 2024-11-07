@@ -43,6 +43,7 @@ class CoolerDevice(GenericHVACDevice):
         openings: OpeningManager,
         features: FeatureManager,
         hvac_power: HvacPowerManager,
+        always_on: bool
     ) -> None:
         super().__init__(
             hass,
@@ -64,6 +65,7 @@ class CoolerDevice(GenericHVACDevice):
             openings,
             self.async_turn_on,
             self.async_turn_off,
+            always_on
         )
 
     @property

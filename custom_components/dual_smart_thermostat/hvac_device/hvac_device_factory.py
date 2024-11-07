@@ -16,6 +16,7 @@ from custom_components.dual_smart_thermostat.const import (
     CONF_HEATER,
     CONF_INITIAL_HVAC_MODE,
     CONF_MIN_DUR,
+    CONF_COOLER_ALWAYS_ON
 )
 from custom_components.dual_smart_thermostat.hvac_device.controllable_hvac_device import (
     ControlableHVACDevice,
@@ -93,6 +94,8 @@ class HVACDeviceFactory:
         self._min_cycle_duration: timedelta = config.get(CONF_MIN_DUR)
 
         self._initial_hvac_mode = config.get(CONF_INITIAL_HVAC_MODE)
+
+        self._cooler_always_on = config.get(CONF_COOLER_ALWAYS_ON)
 
     def create_device(
         self,
@@ -282,6 +285,7 @@ class HVACDeviceFactory:
             openings,
             self._features,
             hvac_power,
+            self._cooler_always_on
         )
 
         if fan_device:

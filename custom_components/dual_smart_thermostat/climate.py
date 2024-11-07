@@ -92,6 +92,7 @@ from .const import (
     ATTR_PREV_TARGET_LOW,
     ATTR_TIMEOUT,
     CONF_AC_MODE,
+    CONF_COOLER_ALWAYS_ON,
     CONF_AUX_HEATER,
     CONF_AUX_HEATING_DUAL_MODE,
     CONF_AUX_HEATING_TIMEOUT,
@@ -219,6 +220,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         ),
         vol.Optional(CONF_OUTSIDE_SENSOR): cv.entity_id,
         vol.Optional(CONF_AC_MODE): cv.boolean,
+        vol.Optional(CONF_COOLER_ALWAYS_ON): cv.boolean,
         vol.Optional(CONF_HEAT_COOL_MODE): cv.boolean,
         vol.Optional(CONF_MAX_TEMP): vol.Coerce(float),
         vol.Optional(CONF_MIN_DUR): vol.All(cv.time_period, cv.positive_timedelta),
@@ -288,7 +290,7 @@ async def async_setup_platform(
     sensor_stale_duration: timedelta | None = config.get(CONF_STALE_DURATION)
     sensor_heat_pump_cooling_entity_id = config.get(CONF_HEAT_PUMP_COOLING)
     keep_alive = config.get(CONF_KEEP_ALIVE)
-
+    cooler_always_on = config.get(CONF_COOLER_ALWAYS_ON)
     precision = config.get(CONF_PRECISION)
     unit = hass.config.units.temperature_unit
     unique_id = config.get(CONF_UNIQUE_ID)
@@ -323,6 +325,7 @@ async def async_setup_platform(
                 sensor_stale_duration,
                 sensor_heat_pump_cooling_entity_id,
                 keep_alive,
+                cooler_always_on,
                 precision,
                 unit,
                 unique_id,
@@ -378,6 +381,7 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
         sensor_stale_duration,
         sensor_heat_pump_cooling_entity_id,
         keep_alive,
+        cooler_always_on,
         precision,
         unit,
         unique_id,
@@ -419,6 +423,7 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
         self.sensor_heat_pump_cooling_entity_id = sensor_heat_pump_cooling_entity_id
 
         self._keep_alive = keep_alive
+        self._cooler_always_on = cooler_always_on
 
         self._sensor_stale_duration = sensor_stale_duration
         self._remove_stale_tracking: Callable[[], None] | None = None
