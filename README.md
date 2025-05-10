@@ -1,6 +1,7 @@
-# Home Assistant Dual Smart Thermostat component
+# Home Assistant Dual Smart Thermostat w/ cooler always on component
 
 The `dual_smart_thermostat` is an enhanced version of generic thermostat implemented in Home Assistant.
+This fork adds the always_on option for cooler devices. This allows an AC to keep running all the time instead of being turned on and off by the dual smart thermostat climate entity.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/swingerman/ha-dual-smart-thermostat) ![Release](https://img.shields.io/github/v/release/swingerman/ha-dual-smart-thermostat?style=for-the-badge) [![Donate](https://img.shields.io/badge/Donate-PayPal-yellowgreen?style=for-the-badge&logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=S6NC9BYVDDJMA&source=url)
 
