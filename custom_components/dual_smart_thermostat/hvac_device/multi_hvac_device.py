@@ -75,6 +75,7 @@ class MultiHvacDevice(HVACDevice, ControlableHVACDevice):
         for device in self.hvac_devices:
             if device.is_active:
                 return True
+        return False
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -147,10 +148,11 @@ class MultiHvacDevice(HVACDevice, ControlableHVACDevice):
         for device in self.hvac_devices:
             if self.hvac_mode in device.hvac_modes:
                 await device.async_control_hvac(time, force)
+                self._hvac_action_reason = device.HVACActionReason
             else:
                 await device.async_turn_off()
 
-            self._hvac_action_reason = device.HVACActionReason
+            # self._hvac_action_reason = device.HVACActionReason
 
     async def async_on_startup(self, async_write_ha_state_cb: Callable = None):
         self._async_write_ha_state_cb = async_write_ha_state_cb

@@ -1,5 +1,6 @@
 """The tests for the dual_smart_thermostat."""
 
+import asyncio
 import datetime
 from datetime import timedelta
 import logging
@@ -345,6 +346,58 @@ async def test_set_preset_mode_set_temp_keeps_preset_mode(
 @pytest.mark.parametrize(
     ("preset", "preset_temp"),
     [
+        (PRESET_AWAY, 16),
+        (PRESET_COMFORT, 20),
+        (PRESET_ECO, 18),
+        (PRESET_HOME, 19),
+        (PRESET_SLEEP, 17),
+        (PRESET_BOOST, 10),
+        (PRESET_ACTIVITY, 21),
+        (PRESET_ANTI_FREEZE, 5),
+    ],
+)
+async def test_set_same_preset_mode_restores_preset_temp_from_modified(
+    hass: HomeAssistant,
+    setup_comp_heat_ac_cool_presets,  # noqa: F811
+    preset,
+    preset_temp,
+) -> None:
+    """Test the setting preset mode again after modifying temperature.
+
+    Verify preset mode called twice restores presete temperatures.
+    """
+
+    target_temp = 32
+
+    # Sets the temperature and apply preset mode, temp should be preset_temp
+    await common.async_set_temperature(hass, 23)
+    await common.async_set_preset_mode(hass, preset)
+    state = hass.states.get(common.ENTITY)
+    assert state.attributes.get("temperature") == preset_temp
+    assert state.attributes.get(ATTR_PREV_TARGET) == 23
+
+    # Changes target temperature, preset mode should be preserved
+    await common.async_set_temperature(hass, target_temp)
+
+    state = hass.states.get(common.ENTITY)
+    assert state.attributes.get("temperature") == target_temp
+    assert state.attributes.get("preset_mode") == preset
+    assert state.attributes.get(ATTR_PREV_TARGET) == 23
+
+    # Sets the same preset_mode again, temp should be picked from preset
+    await common.async_set_preset_mode(hass, preset)
+    state = hass.states.get(common.ENTITY)
+    assert state.attributes.get("temperature") == preset_temp
+
+    # Sets the  preset_mode to none, temp should be picked from saved temp
+    await common.async_set_preset_mode(hass, PRESET_NONE)
+    state = hass.states.get(common.ENTITY)
+    assert state.attributes.get("temperature") == 23
+
+
+@pytest.mark.parametrize(
+    ("preset", "preset_temp"),
+    [
         (PRESET_NONE, 23),
         (PRESET_AWAY, 16),
         (PRESET_COMFORT, 20),
@@ -415,6 +468,27 @@ async def test_set_target_temp_ac_off(
     assert call.domain == HASS_DOMAIN
     assert call.service == SERVICE_TURN_OFF
     assert call.data["entity_id"] == common.ENT_SWITCH
+
+
+async def test_set_target_temp_ac_and_hvac_mode(
+    hass: HomeAssistant, setup_comp_heat_ac_cool  # noqa: F811
+) -> None:
+    """Test the setting of the target temperature and HVAC mode together."""
+
+    # Given
+    await common.async_set_hvac_mode(hass, HVACMode.OFF)
+    await hass.async_block_till_done()
+    state = hass.states.get(common.ENTITY)
+    assert state.state == HVACMode.OFF
+
+    # When
+    await common.async_set_temperature(hass, temperature=30, hvac_mode=HVACMode.COOL)
+    await hass.async_block_till_done()
+
+    # Then
+    state = hass.states.get(common.ENTITY)
+    assert state.attributes.get("temperature") == 30.0
+    assert state.state == HVACMode.COOL
 
 
 async def test_turn_away_mode_on_cooling(
@@ -1257,7 +1331,7 @@ async def test_cooler_mode_opening_hvac_action_reason(
                 "initial_hvac_mode": HVACMode.COOL,
                 "openings": [
                     opening_1,
-                    {"entity_id": opening_2, "timeout": {"seconds": 10}},
+                    {"entity_id": opening_2, "timeout": {"seconds": 5}},
                 ],
             }
         },
@@ -1303,10 +1377,11 @@ async def test_cooler_mode_opening_hvac_action_reason(
         == HVACActionReason.TARGET_TEMP_NOT_REACHED
     )
 
-    # wait 10 seconds
-    common.async_fire_time_changed(
-        hass, dt_util.utcnow() + datetime.timedelta(minutes=15)
-    )
+    # wait 5 seconds
+    # common.async_fire_time_changed(
+    #     hass, dt_util.utcnow() + datetime.timedelta(seconds=15)
+    # )
+    await asyncio.sleep(5)
     await hass.async_block_till_done()
 
     assert (
@@ -1538,7 +1613,7 @@ async def test_cooler_mode_opening(
                 "initial_hvac_mode": HVACMode.COOL,
                 "openings": [
                     opening_1,
-                    {"entity_id": opening_2, "timeout": {"seconds": 10}},
+                    {"entity_id": opening_2, "timeout": {"seconds": 5}},
                 ],
             }
         },
@@ -1569,11 +1644,12 @@ async def test_cooler_mode_opening(
 
     assert hass.states.get(cooler_switch).state == STATE_ON
 
-    # wait 10 seconds, actually 133 due to the other tests run time seems to affect this
+    # wait 5 seconds, actually 133 due to the other tests run time seems to affect this
     # needs to separate the tests
-    common.async_fire_time_changed(
-        hass, dt_util.utcnow() + datetime.timedelta(minutes=10)
-    )
+    # common.async_fire_time_changed(
+    #     hass, dt_util.utcnow() + datetime.timedelta(minutes=10)
+    # )
+    await asyncio.sleep(5)
     await hass.async_block_till_done()
 
     assert hass.states.get(cooler_switch).state == STATE_OFF

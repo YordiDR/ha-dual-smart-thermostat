@@ -12,6 +12,7 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.components.climate.const import (
+    ATTR_HVAC_MODE,
     ATTR_TARGET_TEMP_HIGH,
     ATTR_TARGET_TEMP_LOW,
     PRESET_NONE,
@@ -157,6 +158,8 @@ PRESET_SCHEMA = {
     vol.Optional(ATTR_HUMIDITY): vol.Coerce(float),
     vol.Optional(ATTR_TARGET_TEMP_LOW): vol.Coerce(float),
     vol.Optional(ATTR_TARGET_TEMP_HIGH): vol.Coerce(float),
+    vol.Optional(CONF_MAX_FLOOR_TEMP): vol.Coerce(float),
+    vol.Optional(CONF_MIN_FLOOR_TEMP): vol.Coerce(float),
 }
 
 SECONDARY_HEATING_SCHEMA = {
@@ -626,6 +629,11 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
             _LOGGER.debug("restoring hvac_mode: %s", hvac_mode)
             await self.async_set_hvac_mode(hvac_mode, is_restore=True)
 
+            _LOGGER.debug(
+                "startup hvac_action_reason: %s",
+                old_state.attributes.get(ATTR_HVAC_ACTION_REASON),
+            )
+
             self._hvac_action_reason = old_state.attributes.get(ATTR_HVAC_ACTION_REASON)
 
         else:
@@ -651,6 +659,8 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
 
         if should_control_climate:
             await self._async_control_climate(force=True)
+
+        self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self) -> None:
         """Call when entity will be removed from hass."""
@@ -890,15 +900,21 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
         temperature = kwargs.get(ATTR_TEMPERATURE)
         temp_low = kwargs.get(ATTR_TARGET_TEMP_LOW)
         temp_high = kwargs.get(ATTR_TARGET_TEMP_HIGH)
+        hvac_mode = kwargs.get(ATTR_HVAC_MODE)
 
         _LOGGER.info(
-            "Setting temperatures. Temp: %s, Low: %s, High: %s",
+            "Setting temperatures. Temp: %s, Low: %s, High: %s, Hvac Mode: %s",
             temperature,
             temp_low,
             temp_high,
+            hvac_mode,
         )
 
         temperatures = TargetTemperatures(temperature, temp_high, temp_low)
+
+        if hvac_mode is not None:
+            _LOGGER.info("Setting hvac mode with temperature: %s", hvac_mode)
+            await self.async_set_hvac_mode(hvac_mode)
 
         if self.features.is_configured_for_heat_cool_mode:
             self._set_temperatures_dual_mode(temperatures)
@@ -1246,12 +1262,39 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
         _LOGGER.info(
             "Switch changed: old_state: %s, new_state: %s", old_state, new_state
         )
+
         if new_state is None:
             return
         if old_state is None:
             self.hass.create_task(self._check_device_initial_state())
 
         self.async_write_ha_state()
+
+        self._resume_from_state(old_state, new_state)
+
+    def _resume_from_state(self, old_state: State, new_state: State) -> None:
+        """Resume from state."""
+
+        if old_state is None and new_state is not None:
+            _LOGGER.debug(
+                "Resuming from state. Old state is None, New State: %s", new_state
+            )
+            self.hass.create_task(self._async_control_climate())
+
+        if old_state is not None and new_state is not None:
+            _LOGGER.debug(
+                "Resuming from state. Old state: %s, New State: %s",
+                old_state.state,
+                new_state.state,
+            )
+            from_state = old_state.state
+            to_state = new_state.state
+
+            if to_state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) and from_state in (
+                STATE_UNAVAILABLE,
+                STATE_UNKNOWN,
+            ):
+                self.hass.create_task(self._async_control_climate())
 
     @property
     def _is_device_active(self) -> bool:
@@ -1260,17 +1303,14 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
-        _LOGGER.info(
-            "Climate Setting preset mode: %s, is_range_mode: %s",
-            preset_mode,
-            self.features.is_range_mode,
-        )
-
         old_preset_mode = self.presets.preset_mode
 
-        if old_preset_mode == preset_mode:
-            _LOGGER.debug("Preset mode is the same, skipping")
-            return
+        _LOGGER.info(
+            "Climate Setting preset mode: %s, old_preset_mode: %s, is_range_mode: %s",
+            preset_mode,
+            old_preset_mode,
+            self.features.is_range_mode,
+        )
 
         self.presets.set_preset_mode(preset_mode)
 
@@ -1288,7 +1328,7 @@ class DualSmartThermostat(ClimateEntity, RestoreEntity):
         if self.features.is_configured_for_dryer_mode:
 
             self.environment.set_humidity_from_preset(
-                self.presets.preset_mode, self.presets.preset_env
+                self.presets.preset_mode, self.presets.preset_env, old_preset_mode
             )
 
         await self._async_control_climate(force=True)
